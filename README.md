@@ -1,6 +1,6 @@
 # SVAT: Secure Variant Annotation and Aggregation Tool
 
-This repository contain source code and documentation for SVAT, a computer program that can be used for secure outsourcing of 2 basic tasks: 
+This repository contains the source code and documentation for SVAT, a computer program that can be used for secure outsourcing of 2 basic tasks: 
 
 1. **Variant Annotation:** Given a list of small variant loci (Single nucleotide variants and small insertion/deletions -- Indels) with alternate alleles, SVAT can be used to annotate the variants with respec to their impact on the protein-coding sequences.
 2. **Allele Frequency Aggregation:** This is basically secure pooling and counting of variant allele frequencies. SVAT can perform counting at the allele count (i.e., allele frequency) or at variant existence level (similar to beacons).
@@ -101,7 +101,7 @@ Aggregation process starts with a genotype matrix. It is necessary to separat et
 1. **Genotype encoding and coordinate vectorization:** Following separation of VCF per chromosomes, SVAT re-encodes and generates a genotype matrix in vectorized coordinates.
 
 ```
-encoding=0
+encoding=0 # Set to 1 for counting alleles.
 SVAT -encode_SNV_genotypes_2_matrix_per_VCF per_chrom_VCF sample_ids.list EOI_gencode19_gene_exons.bed_merged.bed ${encoding} Encoded_Genotypes
 ```
 
