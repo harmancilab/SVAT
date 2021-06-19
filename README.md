@@ -63,7 +63,16 @@ Variant annotation takes a VCF file as input. SVAT can generate simualted VCF fi
 
 ```
 # Generate simulated variants.
-HG38_DIR=genome
+HG38_DIR=hg38_genome
+
+# First, download and process the genome sequence.
+mkdir $HG38_DIR
+cd $HG38_DIR
+wget -c http://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+SVAT -binarize_fasta_per_file hg38.fa.gz .
+cd ..
+
+# Now we can simulate.
 EOI_exons_fp=EOI_gencode31_transcript_exons_merged.bed
 SVAT -generate_simulated_InDels_on_EOI $EOI_exons_fp 10 $mutation_prob 1.999 ${HG38_DIR} simulated_dels.vcf.gz
 ```
