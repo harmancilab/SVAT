@@ -12,7 +12,7 @@
 
 This repository contains the source code and documentation for SVAT, a computer program that can be used for secure outsourcing of 2 basic tasks: 
 
-1. **Variant Annotation:** Given a list of small variant loci (Single nucleotide variants and small insertion/deletions -- Indels) with alternate alleles, SVAT can be used to annotate the variants with respect to their impact on the protein-coding sequences.
+1. **Variant Annotation:** Given a list of small variant loci (single nucleotide variants and small insertion/deletions -- Indels) with alternate alleles, SVAT can be used to annotate the variants with respect to their impact on the protein-coding sequences.
 2. **Allele Frequency Aggregation:** This is basically secure pooling and counting of variant allele frequencies. SVAT can perform counting at the allele count (i.e., allele frequency) or  variant existence level (similar to beacons).
 
 SVAT provides a general framework for storing the sensitive variant and genotype information securely in an encrypted format. SVAT makes use of homomorphic encryption (HE) security framework. HE has numerous advantages that make it very appealing for protecting data:
@@ -20,7 +20,7 @@ SVAT provides a general framework for storing the sensitive variant and genotype
 2. The encrypted data is secure (including quantum attacks) even if it is stolen/hacked by unauthorized entities.
 3. Encrypted data can be used on a cloud with no repercussions. Thus, HE frameworks mix very well with the cloud's massive computational and storage resources.
 
-A major limitation of HE is that it can be notoriously slow for certain computations. **Thanks to recent advancements in HE literature**, most machine learning models can be securely run at speeds comparable to computing on the data in plain format. 
+A major limitation of HE is that it can be notoriously slow for certain computations. **Thanks to recent advancements in HE literature**, machine learning models can be securely run at speeds comparable to computing on the data in plain format. 
 
 SVAT provides a framework that combines an efficient data representation with ultra-fast secure HE evaluation schemes to provide high-speed aggregation/annotation operations.
 
