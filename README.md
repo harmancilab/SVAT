@@ -13,7 +13,7 @@
 This repository contains the source code and documentation for SVAT, a computer program that can be used for secure outsourcing of 2 basic tasks: 
 
 1. **Variant Annotation:** Given a list of small variant loci (single nucleotide variants and small insertion/deletions -- Indels) with alternate alleles, SVAT can be used to annotate the variants with respect to their impact on the protein-coding sequences.
-2. **Allele Frequency Aggregation:** This is basically secure pooling and counting of variant allele frequencies. SVAT can perform counting at the allele count (i.e., allele frequency) or  variant existence level (similar to beacons).
+2. **Allele Frequency Aggregation:** This is basically secure pooling and counting of variant allele frequencies. SVAT can perform counting at the allele count (i.e., allele frequency) or variant existence level (similar to beacons).
 
 SVAT provides a general framework for storing the sensitive variant and genotype information securely in an encrypted format. SVAT makes use of homomorphic encryption (HE) security framework. HE has numerous advantages that make it very appealing for protecting data:
 1. The data stays encrypted at-rest, in-transit, and even while it is being analyzed. In other words, data does not ever need to be decrypted.
@@ -45,7 +45,7 @@ You can download the main project with all contained submodule to your local com
 git clone --recurse-submodules https://github.com/harmancilab/SVAT.git
 ```
 
-To build SVAT, run following commands on the base directory:
+To build SVAT, run the following commands on the base directory:
 
 ```
 make clean
@@ -94,9 +94,9 @@ EOI_exons_fp=EOI_gencode31_transcript_exons_merged.bed
 SVAT -generate_simulated_InDels_on_EOI $EOI_exons_fp 10 $mutation_prob 1.999 ${HG38_DIR} simulated_dels.vcf.gz
 ```
 
-Above command simulates deletion variants.
+The above command simulates deletion variants.
 
-1. **VCF Conversion:** First, SVAT processes VCF file and separates into chromosomes.
+1. **VCF Conversion:** First, SVAT processes the VCF file and separates it into chromosomes.
 
 ```
 # Separate VCF into chromosomes.
@@ -112,8 +112,8 @@ EOI_exons_fp=EOI_gencode31_transcript_exons_merged.bed
 SVAT -signalize_Deletion_genotypes_per_VCF $EOI_exons_fp per_chrom_VCF VCF_signal
 ```
 
-3. **Encryption and Secure Annotation and Decryption of the Vectorized Variants (HESVAT)**
-The variants are encrypted and secured using the commands under HESVAT's annotation task (task1): [Secure Annotation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-1-Secure-Annotation)
+3. **Encryption, Secure Annotation and Decryption of the Vectorized Variants (HESVAT)**
+The variants are encrypted and securely used by the commands under HESVAT's annotation task (task1): [Secure Annotation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-1-Secure-Annotation)
 
 4. **Translation of the Annotated Variants Vector**
 Given the decrypted signal is stored under 'Annotated_Signal', the deletions can be translated using the following command:
@@ -131,5 +131,5 @@ encoding=0 # Set to 1 for counting alleles.
 SVAT -encode_SNV_genotypes_2_matrix_per_VCF per_chrom_VCF sample_ids.list EOI_gencode19_gene_exons.bed_merged.bed ${encoding} Encoded_Genotypes
 ```
 
-2. **Encryption (Re-encryption), Secure Aggregation and Decryption of the Genotype Matrix**: HESVAT is used to encrypt the encoded genotype matrix and securely aggregate it, as described here [Secure Aggregation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-2-Secure-Aggregation)
+2. **Encryption (Re-encryption), Secure Aggregation and Decryption of the Genotype Matrix**: HESVAT is used to encrypt the encoded genotype matrix and securely aggregate it, as described in [Secure Aggregation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-2-Secure-Aggregation)
 HESVAT can also perform re-encryption and aggregation of the matrices. The re-encryption is described here [Genotype re-encryption](https://github.com/K-miran/HESVAT/tree/808fc23#Task-3-Secure-Aggregation-by-proxy-encryption)
