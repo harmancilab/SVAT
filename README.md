@@ -113,7 +113,7 @@ SVAT -signalize_Deletion_genotypes_per_VCF $EOI_exons_fp per_chrom_VCF VCF_signa
 ```
 
 3. **Encryption, Secure Annotation and Decryption of the Vectorized Variants (HESVAT)**
-The variants are encrypted and securely used by the commands under HESVAT's annotation task (task1): [Secure Annotation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-1-Secure-Annotation)
+The variants are encrypted and securely used by the commands under HESVAT's annotation task (task1): [Secure Annotation](https://github.com/K-miran/HESVAT/tree/f7a434a#Task-1-Secure-Annotation)
 
 4. **Translation of the Annotated Variants Vector**
 Given the decrypted signal is stored under 'Annotated_Signal', the deletions can be translated using the following command:
@@ -131,5 +131,5 @@ encoding=0 # Set to 1 for counting alleles.
 SVAT -encode_SNV_genotypes_2_matrix_per_VCF per_chrom_VCF sample_ids.list EOI_gencode19_gene_exons.bed_merged.bed ${encoding} Encoded_Genotypes
 ```
 
-2. **Encryption (Re-encryption), Secure Aggregation and Decryption of the Genotype Matrix**: HESVAT is used to encrypt the encoded genotype matrix and securely aggregate it, as described in [Secure Aggregation](https://github.com/K-miran/HESVAT/tree/808fc23#Task-2-Secure-Aggregation)
-HESVAT can also perform re-encryption and aggregation of the matrices. The re-encryption is described here [Genotype re-encryption](https://github.com/K-miran/HESVAT/tree/808fc23#Task-3-Secure-Aggregation-by-proxy-encryption)
+2. **Encryption (Re-encryption), Secure Aggregation and Decryption of the Genotype Matrix**: HESVAT is used to encrypt the encoded genotype matrix and securely aggregate it, as described in [Secure Aggregation](https://github.com/K-miran/HESVAT/tree/f7a434a#Task-2-Secure-Aggregation)
+HESVAT can also perform re-encryption and aggregation of the matrices. The re-encryption is described here [Genotype re-encryption](https://github.com/K-miran/HESVAT/tree/f7a434a#Task-3-Secure-Aggregation-by-proxy-encryption)
