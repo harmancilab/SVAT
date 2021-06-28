@@ -1,0 +1,3 @@
+[submodule "HESVAT"]
+	path = HESVAT
+	url = https://github.com/K-miran/HESVAT
