@@ -273,6 +273,858 @@ vector<t_annot_region*>* load_VEP_as_regions(char* vep_op_fp)
 	return(vep_regs);
 }
 
+vector<char*>* get_annovar_consequence_tokens_per_line(char* annovar_line)
+{
+	t_string_tokens* annovar_toks = t_string::tokenize_by_chars(annovar_line, "\t");
+
+	// Get coding impact.
+	vector<char*>* conseq_tokens = new vector<char*>();
+	if (!t_string::compare_strings(annovar_toks->at(8)->str(), "."))
+	{
+		conseq_tokens->push_back(t_string::copy_me_str(annovar_toks->at(8)->str()));
+	}
+
+	// Check splicing impact.
+	char splicing_str[] = "splicing";
+	int i_match = 0;
+	if (t_string::compare_substrings_ci(annovar_toks->at(5)->str(), splicing_str, i_match))
+	{
+		//conseq_tokens->push_back(t_string::copy_me_str(annovar_toks->at(5)->str()));
+		conseq_tokens->push_back(t_string::copy_me_str(splicing_str));
+	}
+
+	t_string::clean_tokens(annovar_toks);
+
+	return conseq_tokens;
+}
+
+vector<char*>* get_annovar_impacted_element_ids_per_line(char* annovar_line)
+{
+	vector<char*>* impacted_element_ids = new vector<char*>();
+
+	t_string_tokens* info_toks = t_string::tokenize_by_chars(annovar_line, "\t");
+
+	for (int i_tok = 0; i_tok < info_toks->size(); i_tok++)
+	{
+		if (info_toks->at(i_tok)->compare("."))
+		{
+			continue;
+		}
+
+		if (i_tok == 9)
+		{
+			t_string_tokens* cur_info_tok_toks = info_toks->at(i_tok)->tokenize_by_chars(",");
+
+			for (int i_ttok = 0; i_ttok < cur_info_tok_toks->size(); i_ttok++)
+			{
+				if (!cur_info_tok_toks->at(i_ttok)->compare("."))
+				{
+					t_string_tokens* cur_info_tok_tok_toks = t_string::tokenize_by_chars(cur_info_tok_toks->at(i_ttok)->str(), ":");
+
+					// If this is not empty, process it.
+					if (!t_string::compare_strings(cur_info_tok_tok_toks->at(1)->str(), "."))
+					{
+						impacted_element_ids->push_back(t_string::copy_me_str(cur_info_tok_tok_toks->at(1)->str()));
+					}
+
+					t_string::clean_tokens(cur_info_tok_tok_toks);
+				}
+			} // i_ttok loop.
+
+			t_string::clean_tokens(cur_info_tok_toks);
+		}
+		else if (i_tok == 7)
+		{
+			t_string_tokens* cur_info_tok_toks = info_toks->at(i_tok)->tokenize_by_chars(";");
+
+			for (int i_ttok = 0; i_ttok < cur_info_tok_toks->size(); i_ttok++)
+			{
+				if (!cur_info_tok_toks->at(i_ttok)->compare("."))
+				{
+					t_string_tokens* cur_info_tok_tok_toks = t_string::tokenize_by_chars(cur_info_tok_toks->at(i_ttok)->str(), ":");
+
+					if (!t_string::compare_strings(cur_info_tok_tok_toks->at(0)->str(), "."))
+					{
+						impacted_element_ids->push_back(t_string::copy_me_str(cur_info_tok_tok_toks->at(0)->str()));
+					}
+
+					t_string::clean_tokens(cur_info_tok_tok_toks);
+				}
+			} // i_ttok loop.
+
+			t_string::clean_tokens(cur_info_tok_toks);
+		}
+	} // i_tok loop.
+
+	t_string::clean_tokens(info_toks);
+
+	for (int i_el = 0; i_el < impacted_element_ids->size(); i_el++)
+	{
+		int i_next_char = 0;
+		t_string_tokens* toks = t_string::get_first_n_tokens(impacted_element_ids->at(i_el), 1, ".", i_next_char);
+		delete[] impacted_element_ids->at(i_el);
+		impacted_element_ids->at(i_el) = t_string::copy_me_str(toks->at(0)->str());
+
+		t_string::clean_tokens(toks);
+	} // i_el loop.
+
+	return(impacted_element_ids);
+}
+
+char* get_annovar_conseq_str_per_list(vector<char*>* annovar_conseq_strs)
+{
+	t_string* full_annovar_conseq_str = new t_string();
+
+	for (int i_str = 0; i_str < annovar_conseq_strs->size(); i_str++)
+	{
+		if (i_str > 0)
+		{
+			full_annovar_conseq_str->concat_char(';');
+		}
+
+		full_annovar_conseq_str->concat_string(annovar_conseq_strs->at(i_str));
+	} // i_str loop.
+
+	char* final_str = t_string::copy_me_str(full_annovar_conseq_str->str());
+	delete(full_annovar_conseq_str);
+	return(final_str);
+}
+
+bool search_svat_impact_in_annovar_impacts(char* svat_conseq_str, vector<char*>* annovar_impact_strs, vector<char*>** matched_annovar_svat_impacts)
+{
+	for (int i_term = 0; i_term < matched_annovar_svat_impacts[1]->size(); i_term++)
+	{
+		if (t_string::compare_strings(matched_annovar_svat_impacts[1]->at(i_term), svat_conseq_str))
+		{
+			char* matching_annovar_impact = matched_annovar_svat_impacts[0]->at(i_term);
+			if (t_string::get_i_str(annovar_impact_strs, matching_annovar_impact) < annovar_impact_strs->size())
+			{
+				return(true);
+			}
+		}
+	} // i_term loop.
+
+	return(false);
+}
+
+bool search_annovar_impact_in_svat_impacts(char* annovar_conseq_str, vector<char*>* svat_impact_strs, vector<char*>** matched_annovar_svat_impacts)
+{
+	for (int i_term = 0; i_term < matched_annovar_svat_impacts[0]->size(); i_term++)
+	{
+		if (t_string::compare_strings(matched_annovar_svat_impacts[0]->at(i_term), annovar_conseq_str))
+		{
+			char* matching_svat_impact = matched_annovar_svat_impacts[1]->at(i_term);
+			if (t_string::get_i_str(svat_impact_strs, matching_svat_impact) < svat_impact_strs->size())
+			{
+				return(true);
+			}
+		}
+	} // i_term loop.
+
+	return(false);
+}
+
+vector<t_annot_region*>* load_ANNOVAR_as_regions(char* annovar_fp)
+{
+	vector<t_annot_region*>* annovar_regs = new vector<t_annot_region*>();
+
+	FILE* f_annovar = open_f(annovar_fp, "r");
+	int line_i = 0;
+	while (1)
+	{
+		char* cur_line = getline(f_annovar);
+		if (cur_line == NULL)
+		{
+			break;
+		}
+
+		if (line_i % 1000 == 0)
+		{
+			fprintf(stderr, "@ %d. annotation..          \r", line_i);
+		}
+
+		line_i++;
+
+		t_annot_region* cur_var_reg = get_empty_region();
+
+		t_string_tokens* cur_toks = t_string::tokenize_by_chars(cur_line, "\t");
+		cur_var_reg->name = t_string::copy_me_str(cur_toks->at(15)->str());
+		cur_var_reg->chrom = t_string::copy_me_str(cur_toks->at(0)->str());
+		cur_var_reg->start = atoi(cur_toks->at(1)->str());
+		cur_var_reg->end = atoi(cur_toks->at(2)->str());
+		cur_var_reg->strand = '+';
+		cur_var_reg->data = cur_line;
+
+		annovar_regs->push_back(cur_var_reg);
+
+		t_string::clean_tokens(cur_toks);
+	} // file reading loop.
+	close_f(f_annovar, annovar_fp);
+
+	return(annovar_regs);
+}
+
+void compare_ANNOVAR_vs_SVAT_variant_wise(char* annovar_annotated_op_fp,
+	char* annovar_2_svat_matching_impact_terms_list_fp,
+	char* annovar_transcripts_list_fp,
+	char* svat_annotated_vcf_fp)
+{
+	fprintf(stderr, "Loading ANNOVAR transcript identifiers from %s\n", annovar_transcripts_list_fp);
+	vector<char*>* annovar_trans_ids = buffer_file(annovar_transcripts_list_fp);
+	sort(annovar_trans_ids->begin(), annovar_trans_ids->end(), t_string::sort_strings_per_prefix);
+	fprintf(stderr, "Loaded and sorted %d ANNOVAR transcript identifiers's.\n", annovar_trans_ids->size());
+
+	fprintf(stderr, "Loading SVAT annotations from %s..\n", svat_annotated_vcf_fp);
+	vector<t_annot_region*>* svat_regs = load_BED_with_line_information(svat_annotated_vcf_fp);
+	fprintf(stderr, "Loaded %d SVAT annotated regions.\n", svat_regs->size());
+
+	// Now, merge the SVAT annotations for each variant.
+	fprintf(stderr, "Sorting SVAT regions by name..\n");
+	sort(svat_regs->begin(), svat_regs->end(), sort_genes_regions_per_name);
+
+	fprintf(stderr, "Pooling SVAT regions by name..\n");
+	vector<t_annot_region*>* pooled_svat_regs = new vector<t_annot_region*>();
+	t_annot_region* cur_pooled_reg = NULL;
+	for (int i_reg = 0; i_reg < svat_regs->size(); i_reg++)
+	{
+		if (cur_pooled_reg == NULL ||
+			!t_string::compare_strings(cur_pooled_reg->name, svat_regs->at(i_reg)->name))
+		{
+			t_annot_region* new_reg = duplicate_region(svat_regs->at(i_reg));
+
+			// Add the current region's line.
+			vector<char*>* cur_pooled_reg_lines = new vector<char*>();
+			cur_pooled_reg_lines->push_back((char*)(svat_regs->at(i_reg)->data));
+			new_reg->data = cur_pooled_reg_lines;
+
+			pooled_svat_regs->push_back(new_reg);
+
+			// Update the pooled region.
+			cur_pooled_reg = new_reg;
+		}
+		else
+		{
+			// Add this region to the pooled regoin.
+			vector<char*>* cur_pooled_reg_lines = (vector<char*>*)(cur_pooled_reg->data);
+			cur_pooled_reg_lines->push_back((char*)(svat_regs->at(i_reg)->data));
+		}
+	} // i_reg loop.
+
+	fprintf(stderr, "Pooled SVAT regions to %d regions.\n", pooled_svat_regs->size());
+
+	fprintf(stderr, "Loading ANNOVAR annotations..\n", annovar_annotated_op_fp);
+	vector<t_annot_region*>* annovar_regs = load_ANNOVAR_as_regions(annovar_annotated_op_fp);
+	fprintf(stderr, "Loaded %d ANNOVAR annotated regions:\n", annovar_regs->size());
+	for (int i_reg = 0; i_reg < 10; i_reg++)
+	{
+		fprintf(stderr, "%s:%d-%d (%s)\n", annovar_regs->at(i_reg)->chrom, annovar_regs->at(i_reg)->start, annovar_regs->at(i_reg)->end, annovar_regs->at(i_reg)->name);
+	} // i_reg loop.
+
+	vector<char*>** matched_annovar_svat_impacts = new vector<char*>*[2];
+	matched_annovar_svat_impacts[0] = new vector<char*>();
+	matched_annovar_svat_impacts[1] = new vector<char*>();
+	vector<char*>* matching_impact_lines = buffer_file(annovar_2_svat_matching_impact_terms_list_fp);
+	for (int i_l = 0; i_l < matching_impact_lines->size(); i_l++)
+	{
+		t_string_tokens* toks = t_string::tokenize_by_chars(matching_impact_lines->at(i_l), "\t");
+		if (toks->size() != 2)
+		{
+			fprintf(stderr, "Could not parse matching impacts line: %s\n", matching_impact_lines->at(i_l));
+			exit(0);
+		}
+
+		matched_annovar_svat_impacts[0]->push_back(t_string::copy_me_str(toks->at(0)->str()));
+		matched_annovar_svat_impacts[1]->push_back(t_string::copy_me_str(toks->at(1)->str()));
+		fprintf(stderr, "%s <=> %s\n", matched_annovar_svat_impacts[0]->back(), matched_annovar_svat_impacts[1]->back());
+	} // i_l loop.
+
+	fprintf(stderr, "Focusing on %d ANNOVAR impacts.\n", matched_annovar_svat_impacts[0]->size());
+
+	for (int i_reg = 0; i_reg < annovar_regs->size(); i_reg++)
+	{
+		annovar_regs->at(i_reg)->score = 0;
+	} // i_reg loop.
+
+	fprintf(stderr, "Loaded %d ANNOVAR annotations, %d signal annotations.\n", annovar_regs->size(), svat_regs->size());
+
+	// Intersect the annotated regions by name, they should be assigned the same name from the files.
+	fprintf(stderr, "Intersecting SVAT and ANNOVAR annotations variant-wise..\n");
+	vector<t_annot_region*>* intersects = intersect_regions_per_names(pooled_svat_regs, annovar_regs, true);
+
+	fprintf(stderr, "Processing %d variant overlaps..\n", intersects->size());
+
+	FILE* f_annovar_specific_annotations = open_f("annovar_specific_annotations.txt", "w");
+	FILE* f_svat_specific_annotations = open_f("svat_specific_annotations.txt", "w");
+
+	FILE* f_annovar_specific_high_impact_annotations = open_f("annovar_specific_HI_annotations.txt", "w");
+	FILE* f_svat_specific_high_impact_annotations = open_f("svat_specific_HI_annotations.txt", "w");
+
+	FILE* f_matching_svat = open_f("matched_svat_annotations.txt", "w");
+	FILE* f_matching_annovar = open_f("matched_annovar_annotations.txt", "w");
+
+	FILE* f_non_existing_annotations = open_f("non_existing_annotations.txt", "w");
+
+	FILE* f_any_HI_mismatches = open_f("any_HI_mismatches.txt", "w");
+
+	// Process the matches.
+	for (int i_int = 0; i_int < intersects->size(); i_int++)
+	{
+		if (i_int % 1000 == 0)
+		{
+			fprintf(stderr, "Processing %d/%d intersect.                \r", i_int, intersects->size());
+		}
+
+		t_intersect_info* int_info = (t_intersect_info*)(intersects->at(i_int)->data);
+		t_annot_region* pooled_svat_reg = int_info->src_reg;
+		t_annot_region* annovar_reg = int_info->dest_reg;
+
+		int SVAT_IMPACT_col_i = 9;
+		int SVAT_element_col_i = 4;
+
+
+		char* cur_annovar_line = (char*)(annovar_reg->data);
+		if (cur_annovar_line == NULL)
+		{
+			break;
+		}
+
+		// We will not need the element id's any more.
+		vector<char*>* annovar_element_ids = get_annovar_impacted_element_ids_per_line(cur_annovar_line);
+
+		// Go over the consequence tokens and choose the highest impact.
+		//t_string_tokens* annovar_conseq_toks = cur_line_toks->at(CONSEQUENCE_col_i)->tokenize_by_chars(", ");
+		vector<char*>* annovar_conseq_strs = get_annovar_consequence_tokens_per_line(cur_annovar_line);
+		char* annovar_conseq_str = get_annovar_conseq_str_per_list(annovar_conseq_strs);
+
+		// Extract the SVAT annotated impacts.
+		vector<char*>* cur_svat_lines = (vector<char*>*)(pooled_svat_reg->data);
+
+		// 1       11479173        11479176        1_11479172_DEL_ENST00000294484  ENST00000423056 +       0       1       -       -       IMPACT_NOMINAL
+		vector<char*>* svat_impact_strs = new vector<char*>();
+		vector<char*>* svat_element_ids = new vector<char*>();
+		for (int line_i = 0; line_i < cur_svat_lines->size(); line_i++)
+		{
+			t_string_tokens* svat_line_toks = t_string::tokenize_by_chars(cur_svat_lines->at(line_i), "\t");
+
+			// Make sure that this element is in ANNOVAR's transcript id's.
+			// Add the SVAT element id for current line.
+			char* cur_svat_element_id = svat_line_toks->at(SVAT_element_col_i)->str();
+
+			int trans_i = t_string::fast_search_string_per_prefix(cur_svat_element_id, annovar_trans_ids, 0, annovar_trans_ids->size());
+			while (trans_i > 0 &&
+				t_string::sort_strings_per_prefix(cur_svat_element_id, annovar_trans_ids->at(trans_i)))
+			{
+				trans_i--;
+			} // move back.
+
+			bool found_trans = false;
+			while (trans_i < annovar_trans_ids->size() &&
+				(t_string::sort_strings_per_prefix(annovar_trans_ids->at(trans_i), cur_svat_element_id) ||
+					t_string::compare_strings(cur_svat_element_id, annovar_trans_ids->at(trans_i))))
+			{
+				if (t_string::compare_strings(cur_svat_element_id, annovar_trans_ids->at(trans_i)))
+				{
+					found_trans = true;
+					break;
+				}
+				trans_i++;
+			} // move back.
+
+			if (found_trans)
+			{
+				svat_element_ids->push_back(t_string::copy_me_str(cur_svat_element_id));
+
+				t_string_tokens* svat_impact_toks = svat_line_toks->at(SVAT_IMPACT_col_i)->tokenize_by_chars(";");
+				vector<char*>* cur_svat_impact_strs = t_string::copy_tokens_2_strs(svat_impact_toks);
+				t_string::clean_tokens(svat_impact_toks);
+
+				// Remove non-HI terms.
+				vector<char*>* filt_cur_svat_impact_strs = new vector<char*>();
+				for (int i_tok = 0; i_tok < cur_svat_impact_strs->size(); i_tok++)
+				{
+					if (t_string::get_i_str(matched_annovar_svat_impacts[1], cur_svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+					{
+						filt_cur_svat_impact_strs->push_back(cur_svat_impact_strs->at(i_tok));
+					}
+				} // i_tok loop.
+
+				// Add these impacts.
+				svat_impact_strs->insert(svat_impact_strs->end(), filt_cur_svat_impact_strs->begin(), filt_cur_svat_impact_strs->end());
+
+				//fprintf(stderr, "FOUND !!!!! %s\n", cur_svat_element_id);
+			}
+			else
+			{
+				//fprintf(stderr, "Skipping %s\n", cur_svat_element_id);
+			}
+		} // line_i loop.
+
+		// 
+		vector<char*>* uniq_svat_impact_strs = t_string::get_unique_entries(svat_impact_strs);
+		char* concat_svat_impacts_str = get_annovar_conseq_str_per_list(uniq_svat_impact_strs);
+		char* concat_svat_elements_id = get_annovar_conseq_str_per_list(svat_element_ids);
+
+		t_string::clean_string_list(svat_impact_strs);
+		svat_impact_strs = uniq_svat_impact_strs;
+
+		// Write the info so far.
+		fprintf(stderr, ">>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+		fprintf(stderr, "Processing matching variant %s:\n\
+ANNOVAR: %s\n\
+SVAT: %s\n", pooled_svat_reg->name, cur_annovar_line, cur_svat_lines->at(0));
+
+		fprintf(stderr, "ANNOVAR impacts:\n");
+		for (int i_t = 0; i_t < annovar_conseq_strs->size(); i_t++)
+		{
+			fprintf(stderr, "%s\n", annovar_conseq_strs->at(i_t));
+		} // i_t loop.
+
+		fprintf(stderr, "SVAT impacts on %s:\n", concat_svat_elements_id);
+		for (int i_t = 0; i_t < svat_impact_strs->size(); i_t++)
+		{
+			fprintf(stderr, "%s\n", svat_impact_strs->at(i_t));
+		} // i_t loop.
+		fprintf(stderr, "<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+
+		// ANNOVAR consequence string should be within SVAT's impact str's.
+		bool found_vep_focus_term = false;
+		bool cur_ANNOVAR_HI = false;
+		for (int i_tok = 0; i_tok < annovar_conseq_strs->size(); i_tok++)
+		{
+			if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+			{
+				cur_ANNOVAR_HI = true;
+			}
+
+			// Make sure that this is an impact we want to focus on.
+			if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+			{
+				found_vep_focus_term = true;
+
+				bool found_cur_impact = 0;
+				if (search_annovar_impact_in_svat_impacts(annovar_conseq_strs->at(i_tok), svat_impact_strs, matched_annovar_svat_impacts))
+				{
+					found_cur_impact = true;
+				}
+
+				if (!found_cur_impact)
+				{
+					fprintf(f_annovar_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+						annovar_conseq_strs->at(i_tok),
+						annovar_conseq_str,
+						concat_svat_impacts_str,
+						cur_annovar_line,
+						cur_svat_lines->at(0));
+
+					if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+					{
+						fprintf(f_annovar_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+							annovar_conseq_strs->at(i_tok),
+							annovar_conseq_str,
+							concat_svat_impacts_str, 
+							cur_annovar_line,
+							cur_svat_lines->at(0));
+					}
+				}
+			}
+		} // i_tok loop.
+
+		if (found_vep_focus_term)
+		{
+			fprintf(f_matching_annovar, "%s\t%s\n", cur_annovar_line, cur_svat_lines->at(0));
+		}
+
+		// Pairwise compare.
+		bool found_svat_focus_term = false;
+		bool cur_SVAT_HI = false;
+		bool found_any_SVAT_HI_impact = false;
+		for (int i_tok = 0; i_tok < svat_impact_strs->size(); i_tok++)
+		{
+			if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+			{
+				cur_SVAT_HI = true;
+			}
+
+			// Make sure that this is an impact we want to focus on among the list of HI impact strings.
+			if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+			{
+				found_svat_focus_term = true;
+
+				bool found_cur_impact = 0;
+				if (search_svat_impact_in_annovar_impacts(svat_impact_strs->at(i_tok), annovar_conseq_strs, matched_annovar_svat_impacts))
+				{
+					found_cur_impact = true;
+					found_any_SVAT_HI_impact = true;
+				}
+
+				// Following checks every single SVAT term, which is too restrictive since SVAT is much more inclusive in the terms it reports.
+				//if (!found_cur_impact)
+				//{
+				//	fprintf(f_svat_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+				//		svat_impact_strs->at(i_tok),
+				//		svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+				//		annovar_conseq_str,
+				//		cur_annovar_line,
+				//		cur_svat_line);
+
+				//	if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+				//	{
+				//		fprintf(f_svat_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+				//			svat_impact_strs->at(i_tok),
+				//			svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+				//			annovar_conseq_str,
+				//			cur_annovar_line,
+				//			cur_svat_line);
+				//	}
+				//}
+			}
+		} // i_tok loop for looping over all the impact strings that SVAT assigned.
+
+		if (!found_any_SVAT_HI_impact &&
+			found_svat_focus_term)
+		{
+			fprintf(f_svat_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+				concat_svat_impacts_str,
+				concat_svat_impacts_str,
+				annovar_conseq_str,
+				cur_annovar_line,
+				cur_svat_lines->at(0));
+
+			fprintf(f_svat_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+				concat_svat_impacts_str,
+				concat_svat_impacts_str,
+				annovar_conseq_str,
+				cur_annovar_line,
+				cur_svat_lines->at(0));
+		}
+
+		if (cur_SVAT_HI != cur_ANNOVAR_HI)
+		{
+			fprintf(f_any_HI_mismatches, "%d\t%d\t%s\t%s\n", cur_SVAT_HI, cur_ANNOVAR_HI, cur_annovar_line, cur_svat_lines->at(0));
+		}
+
+		if (found_svat_focus_term)
+		{
+			fprintf(f_matching_svat, "%s\t%s\n", cur_annovar_line, cur_svat_lines->at(0));
+		}
+
+		// Clean tokens.
+		delete[] concat_svat_impacts_str;
+		t_string::clean_string_list(annovar_conseq_strs);
+		//t_string::clean_tokens(svat_line_toks);
+		t_string::clean_string_list(svat_impact_strs);
+	} // i_int loop.
+
+	fclose(f_annovar_specific_annotations);
+	fclose(f_svat_specific_annotations);
+
+	fclose(f_annovar_specific_high_impact_annotations);
+	fclose(f_svat_specific_high_impact_annotations);
+
+	fclose(f_any_HI_mismatches);
+
+	// Write the unmatched VEP annotations.
+	for (int i_reg = 0; i_reg < annovar_regs->size(); i_reg++)
+	{
+		if (annovar_regs->at(i_reg)->score == 0)
+		{
+			char* cur_line = (char*)(annovar_regs->at(i_reg)->data);
+			fprintf(f_non_existing_annotations, "NOT_MATCHED::%s\n", cur_line);
+		}
+	} // i_reg loop.
+
+	fclose(f_non_existing_annotations);
+
+	fclose(f_matching_annovar);
+	fclose(f_matching_svat);
+}
+
+void compare_ANNOVAR_annotations_with_SVAT_annotations(char* annovar_annotated_op_fp,
+	char* annovar_2_svat_matching_impact_terms_list_fp,
+	char* svat_annotated_vcf_fp)
+{
+	fprintf(stderr, "Loading SVAT annotations from %s..\n", svat_annotated_vcf_fp);
+	vector<t_annot_region*>* svat_regs = load_BED_with_line_information(svat_annotated_vcf_fp);
+	fprintf(stderr, "Loaded %d SVAT annotated regions.\n", svat_regs->size());
+
+	fprintf(stderr, "Loading ANNOVAR annotations..\n", annovar_annotated_op_fp);
+	vector<t_annot_region*>* annovar_regs = load_ANNOVAR_as_regions(annovar_annotated_op_fp);
+	fprintf(stderr, "Loaded %d ANNOVAR annotated regions:\n", annovar_regs->size());
+	for (int i_reg = 0; i_reg < 10; i_reg++)
+	{
+		fprintf(stderr, "%s:%d-%d (%s)\n", annovar_regs->at(i_reg)->chrom, annovar_regs->at(i_reg)->start, annovar_regs->at(i_reg)->end, annovar_regs->at(i_reg)->name);
+	} // i_reg loop.
+
+	vector<char*>** matched_annovar_svat_impacts = new vector<char*>*[2];
+	matched_annovar_svat_impacts[0] = new vector<char*>();
+	matched_annovar_svat_impacts[1] = new vector<char*>();
+	vector<char*>* matching_impact_lines = buffer_file(annovar_2_svat_matching_impact_terms_list_fp);
+	for (int i_l = 0; i_l < matching_impact_lines->size(); i_l++)
+	{
+		t_string_tokens* toks = t_string::tokenize_by_chars(matching_impact_lines->at(i_l), "\t");
+		if (toks->size() != 2)
+		{
+			fprintf(stderr, "Could not parse matching impacts line: %s\n", matching_impact_lines->at(i_l));
+			exit(0);
+		}
+
+		matched_annovar_svat_impacts[0]->push_back(t_string::copy_me_str(toks->at(0)->str()));
+		matched_annovar_svat_impacts[1]->push_back(t_string::copy_me_str(toks->at(1)->str()));
+		fprintf(stderr, "%s <=> %s\n", matched_annovar_svat_impacts[0]->back(), matched_annovar_svat_impacts[1]->back());
+	} // i_l loop.
+
+	fprintf(stderr, "Focusing on %d ANNOVAR impacts.\n", matched_annovar_svat_impacts[0]->size());
+
+	for (int i_reg = 0; i_reg < annovar_regs->size(); i_reg++)
+	{
+		annovar_regs->at(i_reg)->score = 0;
+	} // i_reg loop.
+
+	fprintf(stderr, "Loaded %d ANNOVAR annotations, %d signal annotations.\n", annovar_regs->size(), svat_regs->size());
+
+	// Intersect the annotated regions by name, they should be assigned the same name from the files.
+	vector<t_annot_region*>* intersects = intersect_regions_per_names(svat_regs, annovar_regs, true);
+
+	fprintf(stderr, "Processing %d variant overlaps..\n", intersects->size());
+
+	FILE* f_annovar_specific_annotations = open_f("annovar_specific_annotations.txt", "w");
+	FILE* f_svat_specific_annotations = open_f("svat_specific_annotations.txt", "w");
+
+	FILE* f_annovar_specific_high_impact_annotations = open_f("annovar_specific_HI_annotations.txt", "w");
+	FILE* f_svat_specific_high_impact_annotations = open_f("svat_specific_HI_annotations.txt", "w");
+
+	FILE* f_matching_svat = open_f("matched_svat_annotations.txt", "w");
+	FILE* f_matching_annovar = open_f("matched_annovar_annotations.txt", "w");
+
+	FILE* f_non_existing_annotations = open_f("non_existing_annotations.txt", "w");
+
+	FILE* f_any_HI_mismatches = open_f("any_HI_mismatches.txt", "w");
+
+	// Process the matches.
+	for (int i_int = 0; i_int < intersects->size(); i_int++)
+	{
+		if (i_int % 1000 == 0)
+		{
+			fprintf(stderr, "Processing %d/%d intersect.                \r", i_int, intersects->size());
+		}
+
+		t_intersect_info* int_info = (t_intersect_info*)(intersects->at(i_int)->data);
+		t_annot_region* svat_reg = int_info->src_reg;
+		t_annot_region* annovar_reg = int_info->dest_reg;
+
+		int SVAT_IMPACT_col_i = 9;
+		int SVAT_element_col_i = 4;
+
+		// Lock to transcript specific analysis.
+		int EOI_element_type = VEP_SIGNALIZE_TRANSCRIPT_SUMMARIZATION;
+
+		char* cur_annovar_line = (char*)(annovar_reg->data);
+		if (cur_annovar_line == NULL)
+		{
+			break;
+		}
+
+		vector<char*>* annovar_element_ids = get_annovar_impacted_element_ids_per_line(cur_annovar_line);
+
+		// Go over the consequence tokens and choose the highest impact.
+		//t_string_tokens* annovar_conseq_toks = cur_line_toks->at(CONSEQUENCE_col_i)->tokenize_by_chars(", ");
+		vector<char*>* annovar_conseq_strs = get_annovar_consequence_tokens_per_line(cur_annovar_line);
+		char* annovar_conseq_str = get_annovar_conseq_str_per_list(annovar_conseq_strs);
+
+		// Extract the SVAT annotated impacts.
+		char* cur_svat_line = (char*)(svat_reg->data);
+
+		// 1       11479173        11479176        1_11479172_DEL_ENST00000294484  ENST00000423056 +       0       1       -       -       IMPACT_NOMINAL
+		t_string_tokens* svat_line_toks = t_string::tokenize_by_chars(cur_svat_line, "\t");
+		t_string_tokens* svat_impact_toks = svat_line_toks->at(SVAT_IMPACT_col_i)->tokenize_by_chars(";");
+		vector<char*>* svat_impact_strs = t_string::copy_tokens_2_strs(svat_impact_toks);
+		t_string::clean_tokens(svat_impact_toks);
+
+		char* svat_element_id = svat_line_toks->at(SVAT_element_col_i)->str();
+
+		fprintf(stderr, ">>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+		fprintf(stderr, "Processing matching variant %s:\n\
+ANNOVAR: %s\n\
+SVAT: %s\n", svat_reg->name, cur_annovar_line, cur_svat_line);
+
+		fprintf(stderr, "ANNOVAR impacts:\n");
+		for (int i_t = 0; i_t < annovar_conseq_strs->size(); i_t++)
+		{
+			fprintf(stderr, "%s\n", annovar_conseq_strs->at(i_t));
+		} // i_t loop.
+
+		fprintf(stderr, "SVAT impacts on %s:\n", svat_element_id);
+		for (int i_t = 0; i_t < svat_impact_strs->size(); i_t++)
+		{
+			fprintf(stderr, "%s\n", svat_impact_strs->at(i_t));
+		} // i_t loop.
+		fprintf(stderr, "<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+
+		// The impacted elements must match.
+		// ANNOVAR reports multiple elements per line SVAT/VEP reports each impacted element in a separate line.
+		if (t_string::get_i_str(annovar_element_ids, svat_element_id) < annovar_element_ids->size())
+		{
+			fprintf(stderr, "FOUND ELEMENT MATCH!\n");
+
+			annovar_reg->score = 1;
+
+			// Pairwise compare.
+			bool found_vep_focus_term = false;
+			bool cur_ANNOVAR_HI = false;
+			for (int i_tok = 0; i_tok < annovar_conseq_strs->size(); i_tok++)
+			{
+				if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+				{
+					cur_ANNOVAR_HI = true;
+				}
+
+				// Make sure that this is an impact we want to focus on.
+				if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+				{
+					found_vep_focus_term = true;
+
+					bool found_cur_impact = 0;
+					if(search_annovar_impact_in_svat_impacts(annovar_conseq_strs->at(i_tok), svat_impact_strs, matched_annovar_svat_impacts))
+					{
+						found_cur_impact = true;
+					}
+
+					if (!found_cur_impact)
+					{
+						fprintf(f_annovar_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+							annovar_conseq_strs->at(i_tok),
+							annovar_conseq_str,
+							svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+							cur_annovar_line,
+							cur_svat_line);
+
+						if (t_string::get_i_str(matched_annovar_svat_impacts[0], annovar_conseq_strs->at(i_tok)) < matched_annovar_svat_impacts[0]->size())
+						{
+							fprintf(f_annovar_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+								annovar_conseq_strs->at(i_tok),
+								annovar_conseq_str,
+								svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+								cur_annovar_line,
+								cur_svat_line);
+						}
+					}
+				}
+			} // i_tok loop.
+
+			if (found_vep_focus_term)
+			{
+				fprintf(f_matching_annovar, "%s\t%s\n", cur_annovar_line, cur_svat_line);
+			}
+
+			// Pairwise compare.
+			bool found_svat_focus_term = false;
+			bool cur_SVAT_HI = false;
+			bool found_any_SVAT_HI_impact = false;
+			for (int i_tok = 0; i_tok < svat_impact_strs->size(); i_tok++)
+			{
+				if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+				{
+					cur_SVAT_HI = true;
+				}
+
+				// Make sure that this is an impact we want to focus on among the list of HI impact strings.
+				if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+				{
+					found_svat_focus_term = true;
+
+					bool found_cur_impact = 0;
+					if (search_svat_impact_in_annovar_impacts(svat_impact_strs->at(i_tok), annovar_conseq_strs, matched_annovar_svat_impacts))
+					{
+						found_cur_impact = true;
+						found_any_SVAT_HI_impact = true;
+					}
+
+					// Following checks every single SVAT term, which is too restrictive since SVAT is much more inclusive in the terms it reports.
+					//if (!found_cur_impact)
+					//{
+					//	fprintf(f_svat_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+					//		svat_impact_strs->at(i_tok),
+					//		svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+					//		annovar_conseq_str,
+					//		cur_annovar_line,
+					//		cur_svat_line);
+
+					//	if (t_string::get_i_str(matched_annovar_svat_impacts[1], svat_impact_strs->at(i_tok)) < matched_annovar_svat_impacts[1]->size())
+					//	{
+					//		fprintf(f_svat_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+					//			svat_impact_strs->at(i_tok),
+					//			svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+					//			annovar_conseq_str,
+					//			cur_annovar_line,
+					//			cur_svat_line);
+					//	}
+					//}
+				}
+			} // i_tok loop for looping over all the impact strings that SVAT assigned.
+
+			if (!found_any_SVAT_HI_impact &&
+				found_svat_focus_term)
+			{
+				fprintf(f_svat_specific_annotations, "%s\t%s\t%s\t%s\t%s\n",
+					svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+					svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+					annovar_conseq_str,
+					cur_annovar_line,
+					cur_svat_line);
+
+				fprintf(f_svat_specific_high_impact_annotations, "%s\t%s\t%s\t%s\t%s\n",
+						svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+						svat_line_toks->at(SVAT_IMPACT_col_i)->str(),
+						annovar_conseq_str,
+						cur_annovar_line,
+						cur_svat_line);
+			}
+
+			if (cur_SVAT_HI != cur_ANNOVAR_HI)
+			{
+				fprintf(f_any_HI_mismatches, "%d\t%d\t%s\t%s\n", cur_SVAT_HI, cur_ANNOVAR_HI, cur_annovar_line, cur_svat_line);
+			}
+
+			if (found_svat_focus_term)
+			{
+				fprintf(f_matching_svat, "%s\t%s\n", cur_annovar_line, cur_svat_line);
+			}
+		} // element_id comparison.
+		else
+		{
+			fprintf(stderr, "COULD NOT FIND ELEMENT MATCH!\n");
+		}
+
+		// Clean tokens.
+		t_string::clean_string_list(annovar_conseq_strs);
+		t_string::clean_tokens(svat_line_toks);
+		t_string::clean_string_list(svat_impact_strs);
+	} // i_int loop.
+
+	fclose(f_annovar_specific_annotations);
+	fclose(f_svat_specific_annotations);
+
+	fclose(f_annovar_specific_high_impact_annotations);
+	fclose(f_svat_specific_high_impact_annotations);
+
+	fclose(f_any_HI_mismatches);
+
+	// Write the unmatched VEP annotations.
+	for (int i_reg = 0; i_reg < annovar_regs->size(); i_reg++)
+	{
+		if (annovar_regs->at(i_reg)->score == 0)
+		{
+			char* cur_line = (char*)(annovar_regs->at(i_reg)->data);
+			fprintf(f_non_existing_annotations, "NOT_MATCHED::%s\n", cur_line);
+		}
+	} // i_reg loop.
+
+	fclose(f_non_existing_annotations);
+
+	fclose(f_matching_annovar);
+	fclose(f_matching_svat);
+} // compare_ANNOVAR_annotations_with_SVAT_annotations
+
 void compare_VEP_annotations_with_SVAT_annotations(char* vep_annotated_op_fp, 
 													char* VEP_impact_string_ctx_fp,
 													char* vep_impacts_2_focus_list_fp,

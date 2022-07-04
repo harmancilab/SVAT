@@ -22,6 +22,217 @@ bool __DUMP_CRYPTANNOT_SNV_MSGS__ = false;
 #define MIN(x,y) ((x)<(y)?(x):(y))
 #define MAX(x,y) ((x)>(y)?(x):(y))
 
+void signalize_non_coding_variants_per_VCF(char* EOI_regs_BED_fp,
+	char* per_chrom_VCF_dir,
+	char* op_dir)
+{
+	// Load the EOI's.
+	fprintf(stderr, "Loading EOIs from %s\n", EOI_regs_BED_fp);
+
+	vector<t_annot_region*>* EOI_regs = load_BED(EOI_regs_BED_fp);
+
+	double total_EOI_covg = coverage(EOI_regs);
+	fprintf(stderr, "Loaded %d EOI regions covering %.0f nucleotides.\n", (int)(EOI_regs->size()), total_EOI_covg);
+
+	// The EOI's determine the coordinate system that we will use. The impact value should include this.
+	fprintf(stderr, "Restructuring EOI regions..\n");
+	t_restr_annot_region_list* restr_EOI_regs = restructure_annot_regions(EOI_regs);
+	fprintf(stderr, "Finished restructuring EOI regions.\n");
+
+	// Set the chromosome id's.
+	vector<char*>* chr_ids = restr_EOI_regs->chr_ids;
+
+	int n_encoded_vars = 0;
+	int n_total_vars = 0;
+
+	for (int i_chr = 0; i_chr < chr_ids->size(); i_chr++)
+	{
+		if (n_total_vars > 0)
+		{
+			fprintf(stderr, "Processing %s -- Encoded %d/%d (%.2f) variants.\n", chr_ids->at(i_chr), n_encoded_vars, n_total_vars, ((double)n_encoded_vars) / n_total_vars);
+		}
+
+		// 1       9374375 rs926250        G       A       100     PASS    AC=3207;AF=0.640375;AN=5008;NS=2504;DP=13999;EAS_AF=0.2698;AMR_AF=0.6023;AFR_AF=0.8759;EUR_AF=0.6889;SAS_AF=0.681;AA=A|||;VT=SNP        GT      1|0
+		char cur_chrom_vcf_fp[1000];
+		sprintf(cur_chrom_vcf_fp, "%s/%s.vcf.gz", per_chrom_VCF_dir, chr_ids->at(i_chr));
+		if (check_file(cur_chrom_vcf_fp))
+		{
+			fprintf(stderr, "Reading SNVs in %s\n", cur_chrom_vcf_fp);
+		}
+		else
+		{
+			fprintf(stderr, "Could not find VCF file @ %s, skipping.\n", cur_chrom_vcf_fp);
+			continue;
+		}
+
+		// Following sorts the EOI's per the coordinate system.
+		vector<t_annot_region*>* cur_chr_EOI_regs = restr_EOI_regs->regions_per_chrom[i_chr];
+		sort_set_sorting_info(cur_chr_EOI_regs, sort_regions_per_start_end_name);
+
+		int n_EOI_per_cur_chr = cur_chr_EOI_regs->size();
+
+		fprintf(stderr, "Allocating per allele impact signal.\n");
+		unsigned int* per_element_VCF_signal = new unsigned int[n_EOI_per_cur_chr];
+		memset(per_element_VCF_signal, 0, sizeof(unsigned int) * n_EOI_per_cur_chr);
+
+		// Assign the starting index to each EOI region.
+		//int cumul_signal_index = 1;
+		for (int i_reg = 0; i_reg < cur_chr_EOI_regs->size(); i_reg++)
+		{
+			cur_chr_EOI_regs->at(i_reg)->score = i_reg;
+			//cumul_signal_index += (cur_chr_EOI_regs->at(i_reg)->end - cur_chr_EOI_regs->at(i_reg)->start + 1);
+		} // i_reg loop.
+
+		FILE* f_vcf = open_f(cur_chrom_vcf_fp, "r");
+		int CHROM_col_i = 0;
+		int POSITION_col_i = 1;
+		int VAR_ID_col_i = 2;
+		int REF_ALLELE_col_i = 3;
+		int ALT_ALLELE_col_i = 4;
+		int GENOTYPE_col_i = 9;
+
+		while (1)
+		{
+			char* cur_line = getline(f_vcf);
+			if (cur_line == NULL)
+			{
+				break;
+			}
+
+			if (cur_line[0] == '#')
+			{
+				delete[] cur_line;
+				continue;
+			}
+
+			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
+
+			// Parse the location.
+			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
+			int var_pos_start = atoi(cur_line_toks->at(POSITION_col_i)->str());
+
+			// Following takes only bi-allelic SNVs.
+			int eoi_reg_chr_i = t_string::get_i_str(restr_EOI_regs->chr_ids, var_chr);
+			if (eoi_reg_chr_i == restr_EOI_regs->chr_ids->size())
+			{
+				delete[] cur_line;
+				t_string::clean_tokens(cur_line_toks);
+				continue;
+			}
+
+			// We take the first allele in every SNP.
+			char* ref_allele_str = cur_line_toks->at(REF_ALLELE_col_i)->str();
+			char* alt_allele_str = cur_line_toks->at(ALT_ALLELE_col_i)->str();
+
+			int var_pos_end = var_pos_start + t_string::string_length(ref_allele_str) - 1;
+
+			//char ref_alt_allele[10];
+			//ref_alt_allele[0] = ref_allele;
+			//ref_alt_allele[1] = alt_allele;
+
+			// Update the total variant count.
+			n_total_vars++;
+
+			// Search the current variant.
+			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_pos_start, cur_chr_EOI_regs, 0, cur_chr_EOI_regs->size());
+			while (cur_EOI_reg_i > 0 &&
+				cur_chr_EOI_regs->at(cur_EOI_reg_i)->sort_info->cumulative_sorted_end > var_pos_start)
+			{
+				cur_EOI_reg_i--;
+			}
+
+			// For every overlap, update the allelic signal.
+			bool found_overlap = false;
+			while (cur_EOI_reg_i < cur_chr_EOI_regs->size() &&
+				cur_chr_EOI_regs->at(cur_EOI_reg_i)->sort_info->cumulative_sorted_start <= var_pos_end)
+			{
+				bool overlap = (cur_chr_EOI_regs->at(cur_EOI_reg_i)->start <= var_pos_end &&
+					cur_chr_EOI_regs->at(cur_EOI_reg_i)->end >= var_pos_start);
+
+				if (overlap)
+				{
+					//int l_var = var_pos_end - var_pos_start + 1;
+					//if (l_var > 1)
+					//{
+					//	fprintf(stderr, "Found del overlap: %s\n", cur_line);
+					//}
+
+					// Update the encoded variants.
+					if (!found_overlap)
+					{
+						n_encoded_vars++;
+					}
+
+					// For each overlap, update ref and alternate alleles.
+					//int track_posn = cur_chr_EOI_regs->at(cur_EOI_reg_i)->score + (var_posn - cur_chr_EOI_regs->at(cur_EOI_reg_i)->start);
+
+					for (int allele_i = 0; allele_i < 4; allele_i++)
+					{
+						//per_allele_VCF_signal[nuc_2_num(alt_allele)][track_posn] = 1;
+						per_element_VCF_signal[cur_chr_EOI_regs->at(cur_EOI_reg_i)->score] = 1;
+					} // allele_i loop.
+
+					found_overlap = true;
+
+					if (__DUMP_CRYPTANNOT_SNV_MSGS__)
+					{
+						fprintf(stderr, "Overlap %s: %s:%d-%d:%s\n", cur_line,
+							cur_chr_EOI_regs->at(cur_EOI_reg_i)->chrom,
+							cur_chr_EOI_regs->at(cur_EOI_reg_i)->start,
+							cur_chr_EOI_regs->at(cur_EOI_reg_i)->end,
+							cur_chr_EOI_regs->at(cur_EOI_reg_i)->name);
+					}
+				} // overlap check.
+
+				cur_EOI_reg_i++;
+			} // region loop.
+
+			if (!found_overlap && __DUMP_CRYPTANNOT_SNV_MSGS__)
+			{
+				fprintf(stderr, "Could not find an overlap for %s\n", cur_line);
+			}
+
+			// Free memory.
+			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
+			delete[] cur_line;
+		} // file reading loop.
+		close_f(f_vcf, cur_chrom_vcf_fp);
+
+		fprintf(stderr, "\nFinished reading VCF file.\n");
+
+		// Save the files.
+		char cur_chr_VCF_signal_op_fp[1000];
+		sprintf(cur_chr_VCF_signal_op_fp, "%s/variant_signal_%s.bin.gz", op_dir, chr_ids->at(i_chr));
+		FILE* f_cur_chr_VCF_signal = open_f(cur_chr_VCF_signal_op_fp, "wb");
+		fwrite(per_element_VCF_signal, sizeof(unsigned int), n_EOI_per_cur_chr, f_cur_chr_VCF_signal);
+		close_f(f_cur_chr_VCF_signal, cur_chr_VCF_signal_op_fp);
+
+		delete[] per_element_VCF_signal;
+
+		// Write the BED file with sorted regions that match the signal coordinates in signal file.
+		char cur_sorted_BED_fp[1000];
+		sprintf(cur_sorted_BED_fp, "%s/coord_matching_sorted_regions_%s.bed", op_dir, chr_ids->at(i_chr));
+		dump_BED(cur_sorted_BED_fp, cur_chr_EOI_regs);
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(cur_chr_EOI_regs);
+	} // i_chr loop.
+
+	char chr_ids_fp[1000];
+	sprintf(chr_ids_fp, "%s/chr_ids.txt", op_dir);
+	FILE* f_chrs = open_f(chr_ids_fp, "w");
+	for (int i_chr = 0; i_chr < chr_ids->size(); i_chr++)
+	{
+		fprintf(f_chrs, "%s\n", chr_ids->at(i_chr));
+	} // i_chr loop.
+	fclose(f_chrs);
+} // signalize_non_coding_variants_per_VCF option.
+
 // Write the ternary signal on the EOI=gene_exons.
 void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 	char* per_chrom_VCF_dir,
@@ -31,23 +242,23 @@ void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 	vector<t_annot_region*>* EOI_regs = load_BED(EOI_regs_BED_fp);
 	double total_EOI_covg = coverage(EOI_regs);
 	fprintf(stderr, "Loaded %d EOI regions covering %d nucleotides.\n", (int)(EOI_regs->size()), (int)total_EOI_covg);
-	vector<char*>* all_EOI_ids = new vector<char*>();
-	for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
-	{
-		all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
-	} // i_e loop.
+	//vector<char*>* all_EOI_ids = new vector<char*>();
+	//for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
+	//{
+	//	all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
+	//} // i_e loop.
 
-	  // These are the gene id's that will be used in impact assignments.
-	vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
+	//  // These are the gene id's that will be used in impact assignments.
+	//vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
 
-	fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
-	int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
-	fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
-	if (n_bits_per_element_id > 16)
-	{
-		fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
-		exit(0);
-	}
+	//fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
+	//int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
+	//fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
+	//if (n_bits_per_element_id > 16)
+	//{
+	//	fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
+	//	exit(0);
+	//}
 
 	// The EOI's determine the coordinate system that we will use. The impact value should include this.
 	t_restr_annot_region_list* restr_EOI_regs = restructure_annot_regions(EOI_regs);
@@ -149,24 +360,24 @@ void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 			ref_alt_allele[0] = ref_allele;
 			ref_alt_allele[1] = alt_allele;
 
-			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
-			int per_allele_cnt[5];
-			memset(per_allele_cnt, 0, sizeof(int) * 5);
-			per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])] = 1;
-			per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])] = 1;
+			//// Generate the per allele counts from genotype value.
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//int per_allele_cnt[5];
+			//memset(per_allele_cnt, 0, sizeof(int) * 5);
+			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])] = 1;
+			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])] = 1;
 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-						cur_line,
-						geno_str[0],
-						geno_str[2],
-						geno_str[0] - '0',
-						geno_str[2] - '0');
-				exit(0);
-			}
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//			cur_line,
+			//			geno_str[0],
+			//			geno_str[2],
+			//			geno_str[0] - '0',
+			//			geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, cur_chr_EOI_regs, 0, cur_chr_EOI_regs->size());
@@ -215,6 +426,7 @@ void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 
 			// Free memory.
 			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vcf, cur_chrom_vcf_fp);
@@ -237,6 +449,13 @@ void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 		char cur_sorted_BED_fp[1000];
 		sprintf(cur_sorted_BED_fp, "%s/coord_matching_sorted_regions_%s.bed", op_dir, chr_ids->at(i_chr));
 		dump_BED(cur_sorted_BED_fp, cur_chr_EOI_regs);
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(cur_chr_EOI_regs);
 	} // i_chr loop.
 
 	char chr_ids_fp[1000];
@@ -449,6 +668,7 @@ void signalize_VEP_annotated_SNVs_per_EOI_regs_element_summarization(char* EOI_r
 			if (eoi_reg_chr_i == restr_EOI_regs->chr_ids->size())
 			{
 				delete[] cur_line;
+				delete[] var_chr;
 				t_string::clean_tokens(cur_line_toks);
 				continue;
 			}
@@ -456,6 +676,7 @@ void signalize_VEP_annotated_SNVs_per_EOI_regs_element_summarization(char* EOI_r
 			if (!t_string::compare_strings(var_chr, chr_ids->at(i_chr)))
 			{
 				delete[] cur_line;
+				delete[] var_chr;
 				t_string::clean_tokens(cur_line_toks);
 				continue;
 			}
@@ -612,12 +833,13 @@ neigh_seq_buff, neigh_seq_signal);
 			// If overlap not found, write to the unmatched impact entries.
 			if (!found_overlap)
 			{
-				fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
+				//fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
 				fprintf(f_unmatched, "%s\n", cur_line);
 			}
 
 			// Free memory.
 			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vep_op, vep_op_fp);
@@ -993,7 +1215,7 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 		sprintf(cur_chrom_vcf_fp, "%s/%s.vcf.gz", per_chrom_VCF_dir, anno_var_chr_ids->at(i_chr));
 		if (check_file(cur_chrom_vcf_fp))
 		{
-			fprintf(stderr, "Reading deletes in %s\n", cur_chrom_vcf_fp);
+			fprintf(stderr, "Reading SNVs in %s\n", cur_chrom_vcf_fp);
 		}
 		else
 		{
@@ -1026,11 +1248,11 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 			}
 
 			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
-			if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
-			{
-				fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
-				exit(0);
-			}
+			//if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
+			//{
+			//	fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
+			//	exit(0);
+			//}
 
 			// Parse the location: Note that, for deletions, the position is set to be 1 plus the recorded position in the VCF file as that is the first deleted nucleotide.
 			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
@@ -1053,24 +1275,24 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 			}
 
 			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
 			//int per_allele_cnt[5];
 			//memset(per_allele_cnt, 0, sizeof(int) * 5);
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])]++;
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])]++;
 
-			// Analyze the genotype: Based on the specified genotype, assign the 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-					cur_line,
-					geno_str[0],
-					geno_str[2],
-					geno_str[0] - '0',
-					geno_str[2] - '0');
-				exit(0);
-			}
+			//// Analyze the genotype: Based on the specified genotype, assign the 
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//		cur_line,
+			//		geno_str[0],
+			//		geno_str[2],
+			//		geno_str[0] - '0',
+			//		geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, sorted_cur_chr_EOI_regs, 0, sorted_cur_chr_EOI_regs->size());
@@ -1098,7 +1320,6 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 						sorted_cur_chr_EOI_regs->at(cur_EOI_reg_i)->start,
 						sorted_cur_chr_EOI_regs->at(cur_EOI_reg_i)->end,
 						sorted_cur_chr_EOI_regs->at(cur_EOI_reg_i)->name);
-
 
 					if (__DUMP_CRYPTANNOT_SNV_MSGS__)
 					{
@@ -1257,6 +1478,15 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 
 					found_overlap = true;
 
+					// Free memory.
+					delete cur_var_sorted_impacts;
+					delete[] new_AA;
+					delete[] prev_AA;
+					delete vep_impact_str;
+					delete[] junction_cdna_seq;
+					delete[] original_cdna_seq;
+					delete all_impacts_values;
+
 					fprintf(stderr, "----------------- End New SNV Tracking -----------------\n");
 				} // overlap check.
 
@@ -1264,6 +1494,7 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 			} // Forward searching loop.
 
 			// FRee vcf memory.
+			delete[] var_chr;
 			t_string::clean_tokens(cur_line_toks);
 			delete[] cur_line;
 		} // VCF file path.
@@ -1273,6 +1504,13 @@ void translate_annotated_SNVs_from_annotated_signals(char* annotated_variant_sig
 		{
 			delete[] per_allele_SNV_impact_signal[i_allele];
 		} // i_allele loop.
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < sorted_cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete sorted_cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(sorted_cur_chr_EOI_regs);
 	} // i_chr loop.
 
 	fclose(f_op);

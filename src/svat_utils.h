@@ -69,6 +69,15 @@ void compare_VEP_annotations_with_SVAT_annotations(char* vep_annotated_op_fp,
 	char* high_impacts_list_fp,
 	char* svat_annotated_vcf_fp);
 
+void compare_ANNOVAR_annotations_with_SVAT_annotations(char* annovar_annotated_op_fp,
+	char* annovar_2_svat_matching_impact_terms_list_fp,
+	char* svat_annotated_vcf_fp);
+
+void compare_ANNOVAR_vs_SVAT_variant_wise(char* annovar_annotated_op_fp,
+	char* annovar_2_svat_matching_impact_terms_list_fp,
+	char* annovar_transcripts_list_fp,
+	char* svat_annotated_vcf_fp);
+
 vector<t_VEP_term_ctx*>* load_VEP_annotation_term_context(char* vep_annotation_term_ctx_fp, vector<char*>* sorted_vep_terms);
 
 void separate_VEP_output_per_chromosome(char* vep_op_fp, char* chr_ids_lengths_list_fp, char* per_chrom_op_dir);
@@ -92,6 +101,10 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 	char* op_dir);
 
 void signalize_VCF_SNV_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
+	char* per_chrom_VCF_dir,
+	char* op_dir);
+
+void signalize_non_coding_variants_per_VCF(char* EOI_regs_BED_fp,
 	char* per_chrom_VCF_dir,
 	char* op_dir);
 

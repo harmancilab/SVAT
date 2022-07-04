@@ -913,7 +913,7 @@ geno_neigh_seq_buff, cds_neigh_seq_buff, geno_neigh_seq_signal, cds_neigh_seq_si
 			  // If overlap not found, write to the unmatched impact entries.
 			if (!found_overlap)
 			{
-				fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
+				//fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
 				fprintf(f_unmatched, "%s\n", cur_line);
 			}
 
@@ -1299,12 +1299,13 @@ void signalize_VEP_annotated_Deletes_per_EOI_regs_element_summarization(char* EO
 			// If overlap not found, write to the unmatched impact entries.
 			if (!found_overlap)
 			{
-				fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
+				//fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
 				fprintf(f_unmatched, "%s\n", cur_line);
 			}
 
 			// Free memory.
 			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vep_op, vep_op_fp);
@@ -1524,13 +1525,13 @@ void signalize_VEP_annotated_Inserts_per_EOI_regs_element_summarization(char* EO
 			{
 				int cds_posn = atoi(CDS_posn_tokens->at(0)->str());
 				coding_frame = ((cds_posn - 1) % 3);
-
-				t_string::clean_tokens(CDS_posn_tokens);
 			}
+			t_string::clean_tokens(CDS_posn_tokens);
 
 			int eoi_reg_chr_i = t_string::get_i_str(restr_EOI_regs->chr_ids, var_chr);
 			if (eoi_reg_chr_i == restr_EOI_regs->chr_ids->size())
 			{
+				delete[] var_chr;
 				delete[] cur_line;
 				t_string::clean_tokens(cur_line_toks);
 				continue;
@@ -1538,6 +1539,7 @@ void signalize_VEP_annotated_Inserts_per_EOI_regs_element_summarization(char* EO
 
 			if (!t_string::compare_strings(var_chr, chr_ids->at(i_chr)))
 			{
+				delete[] var_chr;
 				delete[] cur_line;
 				t_string::clean_tokens(cur_line_toks);
 				continue;
@@ -1690,12 +1692,13 @@ void signalize_VEP_annotated_Inserts_per_EOI_regs_element_summarization(char* EO
 			// If overlap not found, write to the unmatched impact entries.
 			if (!found_overlap)
 			{
-				fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
+				//fprintf(stderr, "Could not find an overlap for %s; %s:%d\n", cur_line, vep_element_id, var_posn);
 				fprintf(f_unmatched, "%s\n", cur_line);
 			}
 
 			// Free memory.
 			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vep_op, vep_op_fp);
@@ -1746,23 +1749,23 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 	vector<t_annot_region*>* EOI_regs = load_BED(EOI_regs_BED_fp);
 	double total_EOI_covg = coverage(EOI_regs);
 	fprintf(stderr, "Loaded %d EOI regions covering %d nucleotides.\n", (int)(EOI_regs->size()), (int)total_EOI_covg);
-	vector<char*>* all_EOI_ids = new vector<char*>();
-	for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
-	{
-		all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
-	} // i_e loop.
+	//vector<char*>* all_EOI_ids = new vector<char*>();
+	//for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
+	//{
+	//	all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
+	//} // i_e loop.
 
-	  // These are the gene id's that will be used in impact assignments.
-	vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
+	//  // These are the gene id's that will be used in impact assignments.
+	//vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
 
-	fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
-	int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
-	fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
-	if (n_bits_per_element_id > 16)
-	{
-		fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
-		exit(0);
-	}
+	//fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
+	//int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
+	//fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
+	//if (n_bits_per_element_id > 16)
+	//{
+	//	fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
+	//	exit(0);
+	//}
 
 	// The EOI's determine the coordinate system that we will use. The impact value should include this.
 	t_restr_annot_region_list* restr_EOI_regs = restructure_annot_regions(EOI_regs);
@@ -1837,11 +1840,11 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 			}
 
 			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
-			if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
-			{
-				fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
-				exit(0);
-			}
+			//if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
+			//{
+			//	fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
+			//	exit(0);
+			//}
 
 			// Parse the location: Insert location is used as is, unlike deletions.
 			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
@@ -1882,24 +1885,24 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 			}
 
 			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
 			//int per_allele_cnt[5];
 			//memset(per_allele_cnt, 0, sizeof(int) * 5);
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])]++;
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])]++;
 
-			// Analyze the genotype: Based on the specified genotype, assign the 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-					cur_line,
-					geno_str[0],
-					geno_str[2],
-					geno_str[0] - '0',
-					geno_str[2] - '0');
-				exit(0);
-			}
+			//// Analyze the genotype: Based on the specified genotype, assign the 
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//		cur_line,
+			//		geno_str[0],
+			//		geno_str[2],
+			//		geno_str[0] - '0',
+			//		geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, cur_chr_EOI_regs, 0, cur_chr_EOI_regs->size());
@@ -1948,6 +1951,7 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 
 			// Free memory.
 			t_string::clean_tokens(cur_line_toks);
+			delete[] var_chr;
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vcf, cur_chrom_vcf_fp);
@@ -1970,6 +1974,13 @@ void signalize_VCF_Insertion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 		char cur_sorted_BED_fp[1000];
 		sprintf(cur_sorted_BED_fp, "%s/coord_matching_sorted_regions_%s.bed", op_dir, chr_ids->at(i_chr));
 		dump_BED(cur_sorted_BED_fp, cur_chr_EOI_regs);
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(cur_chr_EOI_regs);
 	} // i_chr loop.
 
 	char chr_ids_fp[1000];
@@ -1993,23 +2004,23 @@ void signalize_VCF_Deletion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 	vector<t_annot_region*>* EOI_regs = load_BED(EOI_regs_BED_fp);
 	double total_EOI_covg = coverage(EOI_regs);
 	fprintf(stderr, "Loaded %d EOI regions covering %d nucleotides.\n", (int)(EOI_regs->size()), (int)total_EOI_covg);
-	vector<char*>* all_EOI_ids = new vector<char*>();
-	for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
-	{
-		all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
-	} // i_e loop.
+	//vector<char*>* all_EOI_ids = new vector<char*>();
+	//for (int i_e = 0; i_e < EOI_regs->size(); i_e++)
+	//{
+	//	all_EOI_ids->push_back(t_string::copy_me_str(EOI_regs->at(i_e)->name));
+	//} // i_e loop.
 
-	  // These are the gene id's that will be used in impact assignments.
-	vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
+	//  // These are the gene id's that will be used in impact assignments.
+	//vector<char*>* factorized_EOI_ids = t_string::get_unique_entries(all_EOI_ids);
 
-	fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
-	int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
-	fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
-	if (n_bits_per_element_id > 16)
-	{
-		fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
-		exit(0);
-	}
+	//fprintf(stderr, "%d factorized gene ids.\n", factorized_EOI_ids->size());
+	//int n_bits_per_element_id = (int)(ceil(log(factorized_EOI_ids->size()) / log(2)));
+	//fprintf(stderr, "%d bits per element.\n", n_bits_per_element_id);
+	//if (n_bits_per_element_id > 16)
+	//{
+	//	fprintf(stderr, "ERROR: Cannot use %d bits per element; too many elements?\n", n_bits_per_element_id);
+	//	exit(0);
+	//}
 
 	// The EOI's determine the coordinate system that we will use. The impact value should include this.
 	t_restr_annot_region_list* restr_EOI_regs = restructure_annot_regions(EOI_regs);
@@ -2092,11 +2103,11 @@ void signalize_VCF_Deletion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 			}
 
 			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
-			if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
-			{
-				fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
-				exit(0);
-			}
+			//if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
+			//{
+			//	fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
+			//	exit(0);
+			//}
 
 			// Parse the location: Note that, for deletions, the position is set to be 1 plus the recorded position in the VCF file as that is the first deleted nucleotide.
 			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
@@ -2136,24 +2147,24 @@ void signalize_VCF_Deletion_genotypes_per_EOI_regs(char* EOI_regs_BED_fp,
 			}
 
 			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
 			//int per_allele_cnt[5];
 			//memset(per_allele_cnt, 0, sizeof(int) * 5);
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])]++;
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])]++;
 
-			// Analyze the genotype: Based on the specified genotype, assign the 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-					cur_line,
-					geno_str[0],
-					geno_str[2],
-					geno_str[0] - '0',
-					geno_str[2] - '0');
-				exit(0);
-			}
+			//// Analyze the genotype: Based on the specified genotype, assign the 
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//		cur_line,
+			//		geno_str[0],
+			//		geno_str[2],
+			//		geno_str[0] - '0',
+			//		geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, cur_chr_EOI_regs, 0, cur_chr_EOI_regs->size());
@@ -2533,11 +2544,11 @@ void translate_annotated_Deletions_from_annotated_signals(char* annotated_varian
 			}
 
 			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
-			if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
-			{
-				fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
-				exit(0);
-			}
+			//if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
+			//{
+			//	fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
+			//	exit(0);
+			//}
 
 			// Parse the location: Note that, for deletions, the position is set to be 1 plus the recorded position in the VCF file as that is the first deleted nucleotide.
 			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
@@ -2579,24 +2590,24 @@ void translate_annotated_Deletions_from_annotated_signals(char* annotated_varian
 			}
 
 			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
 			//int per_allele_cnt[5];
 			//memset(per_allele_cnt, 0, sizeof(int) * 5);
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])]++;
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])]++;
 
-			// Analyze the genotype: Based on the specified genotype, assign the 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-					cur_line,
-					geno_str[0],
-					geno_str[2],
-					geno_str[0] - '0',
-					geno_str[2] - '0');
-				exit(0);
-			}
+			//// Analyze the genotype: Based on the specified genotype, assign the 
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//		cur_line,
+			//		geno_str[0],
+			//		geno_str[2],
+			//		geno_str[0] - '0',
+			//		geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, sorted_cur_chr_EOI_regs, 0, sorted_cur_chr_EOI_regs->size());
@@ -3012,6 +3023,12 @@ n_del_tp_utr_nucs, n_impacted_tp_utrs);
 					} // messaging check.
 					delete cur_var_sorted_annotation_signals;
 
+					delete[] junction_cdna_seq;
+
+					delete[] prev_AA;
+					delete[] new_AA;
+					delete[] new_AA_alt;
+
 					found_overlap = true;
 
 					fprintf(stderr, "----------------- End New Del. Tracking -----------------\n");
@@ -3030,6 +3047,15 @@ n_del_tp_utr_nucs, n_impacted_tp_utrs);
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vcf, cur_chrom_vcf_fp);
+
+		delete[] annotated_deletion_signal;
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < sorted_cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete sorted_cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(sorted_cur_chr_EOI_regs);
 
 		fprintf(stderr, "\nFinished reading VCF file.\n");
 	} // i_chr loop.
@@ -3162,11 +3188,11 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 			}
 
 			t_string_tokens* cur_line_toks = t_string::tokenize_by_chars(cur_line, "\t");
-			if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
-			{
-				fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
-				exit(0);
-			}
+			//if (cur_line_toks->size() < (GENOTYPE_col_i + 1))
+			//{
+			//	fprintf(stderr, "Expecting at least %d columns in VCF file.\n", GENOTYPE_col_i + 1);
+			//	exit(0);
+			//}
 
 			// Parse the location: Note that, for deletions, the position is set to be 1 plus the recorded position in the VCF file as that is the first deleted nucleotide.
 			char* var_chr = t_string::copy_me_str(cur_line_toks->at(CHROM_col_i)->str());
@@ -3207,24 +3233,24 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 			}
 
 			// Generate the per allele counts from genotype value.
-			char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
+			//char* geno_str = cur_line_toks->at(GENOTYPE_col_i)->str();
 			//int per_allele_cnt[5];
 			//memset(per_allele_cnt, 0, sizeof(int) * 5);
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[0] - '0'])]++;
 			//per_allele_cnt[nuc_2_num(ref_alt_allele[geno_str[2] - '0'])]++;
 
-			// Analyze the genotype: Based on the specified genotype, assign the 
-			if (geno_str[0] - '0' > 1 ||
-				geno_str[2] - '0' > 1)
-			{
-				fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
-					cur_line,
-					geno_str[0],
-					geno_str[2],
-					geno_str[0] - '0',
-					geno_str[2] - '0');
-				exit(0);
-			}
+			//// Analyze the genotype: Based on the specified genotype, assign the 
+			//if (geno_str[0] - '0' > 1 ||
+			//	geno_str[2] - '0' > 1)
+			//{
+			//	fprintf(stderr, "Invalid allele code: %s: %c, %c; %d, %d",
+			//		cur_line,
+			//		geno_str[0],
+			//		geno_str[2],
+			//		geno_str[0] - '0',
+			//		geno_str[2] - '0');
+			//	exit(0);
+			//}
 
 			// Search the current variant.
 			int cur_EOI_reg_i = locate_posn_region_per_region_starts(var_posn, sorted_cur_chr_EOI_regs, 0, sorted_cur_chr_EOI_regs->size());
@@ -3267,7 +3293,7 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 					vector<unsigned long long>* cur_var_sorted_impacts = new vector<unsigned long long>();
 
 					// Copy the impact signal values, set the first nucleotide's coding frame, and the junction sequence.
-					char* junction_cdna_seq = new char[2*n_neigh_nucs + l_insertion + 3];
+					char* junction_cdna_seq = new char[2 * n_neigh_nucs + l_insertion + 3];
 					char* original_cdna_seq = new char[2 * n_neigh_nucs * l_insertion + 3];
 					memset(junction_cdna_seq, 0, (2 * n_neigh_nucs + l_insertion + 3));
 					memset(original_cdna_seq, 0, (2 * n_neigh_nucs + l_insertion + 3));
@@ -3456,6 +3482,8 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 								cur_codon, new_AA,
 								prev_AA);
 						}
+
+						delete[] new_AA;
 					} // i loop.						
 
 					fprintf(stderr, "%s::%s:%d-%d @ %d;; %llX\n",
@@ -3599,6 +3627,12 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 
 					found_overlap = true;
 
+					delete[] prev_AA; 
+					delete[] junction_cdna_seq;
+					delete[] original_cdna_seq;
+
+					// Copy the impact signal values, set the first nucleotide's coding frame, and the junction sequence.
+
 					fprintf(stderr, "----------------- End New Ins. Tracking -----------------\n");
 				} // overlap check.
 
@@ -3615,6 +3649,15 @@ void translate_annotated_Insertions_from_annotated_signals(char* annotated_varia
 			delete[] cur_line;
 		} // file reading loop.
 		close_f(f_vcf, cur_chrom_vcf_fp);
+
+		delete[] annotated_insertion_signal;
+
+		// Free regions.
+		for (int i_reg = 0; i_reg < sorted_cur_chr_EOI_regs->size(); i_reg++)
+		{
+			delete sorted_cur_chr_EOI_regs->at(i_reg)->sort_info;
+		} // i_reg loop.
+		delete_annot_regions(sorted_cur_chr_EOI_regs);
 
 		fprintf(stderr, "\nFinished reading VCF file.\n");
 	} // i_chr loop.
