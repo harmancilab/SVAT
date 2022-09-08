@@ -50,10 +50,9 @@ To build SVAT, run the following commands on the base directory:
 ```
 make clean
 make
-cd HESVAT
-make clean
-make
 ```
+
+For building HESVAT, please follow the instructions under *HESVAT/* directory.
 
 These commands build the SVAT and HESVAT executables.
 
@@ -71,7 +70,8 @@ wget -c ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_31/genco
 gzip -cd gencode.v31.annotation.gff3.gz | grep "gene_type=protein_coding" | awk {'if($3=="exon" && $1=="chr1")print $0'} | awk 'BEGIN{FS="\t"}{split($9, arr, ";");for(i=1;i<=length(arr);i++){if(substr(arr[i], 1, 7)=="Parent="){print substr(arr[i], 8);;break;}}}' | sort -u > transcript_ids.list
 
 # Generate the sorted target regions.
-gzip -cd gencode.v31.annotation.gff3.gz | grep "gene_type=protein_coding" | awk -v start_pos=1 -v end_pos=250000000 {'if($1=="chr1" && $4>start_pos && $4<end_pos){print $0}'} | SVAT -get_EOIs_BED_per_exonic_regions transcript_ids.list stdin Transcript ${l_exon_extension} EOI_gencode31_transcript_exons_merged.bed
+l_exon_extension=5
+gzip -cd gencode.v31.annotation.gff3.gz | grep "gene_type=protein_coding" | awk -v start_pos=1 -v end_pos=250000000 {'if($1=="chr1" && $4>start_pos && $4<end_pos){print $0}'} | SVAT -get_EOIs_BED_per_exonic_regions transcript_ids.list stdin exon Transcript ${l_exon_extension} EOI_gencode31_transcript_exons_merged.bed
 ```
 
 ### Variant Annotation
@@ -91,6 +91,7 @@ cd ..
 
 # Now we can simulate.
 EOI_exons_fp=EOI_gencode31_transcript_exons_merged.bed
+mutation_prob=0.01
 SVAT -generate_simulated_InDels_on_EOI $EOI_exons_fp 10 $mutation_prob 1.999 ${HG38_DIR} simulated_dels.vcf.gz
 ```
 
@@ -100,6 +101,7 @@ The above command simulates deletion variants.
 
 ```
 # Separate VCF into chromosomes.
+fetchChromSizes hg38 > hg38.list
 rm -f -r per_chrom_VCF/
 mkdir per_chrom_VCF/
 SVAT -separate_VCF_per_chromosome simulated_dels.vcf.gz hg38.list per_chrom_VCF
