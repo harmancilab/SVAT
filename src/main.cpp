@@ -13,12 +13,6 @@ int main(int argc, char* argv[])
 	{
 		fprintf(stderr, "USAGE: %s [options] [arguments]\n\
 Options:\n\
-Variant/Genotype Encryption:\n\
-	Variant Encryption:\n\
-		-encrypt_vectorized_SNVs\n\
-	Genotype Matrix (Re)Encryption\n\
-		-encrypt_encoded_SNV_genotypes_2_matrix\n\
-		-reencrypt_genotype_matrix\n\
 Variant Simulation:\n\
 	-generate_simulated_InDels_on_EOI\n\
 	-generate_simulated_SNVs_on_EOI\n\
@@ -44,9 +38,6 @@ Annotation Signal Processing:\n\
 	Plaintext:\n\
 		-multiply_signalized_SNVs_and_annotations\n\
 		-multiply_signalized_Indels_and_annotations\n\
-	Secure:\n\
-		-secure_multiply_signalized_SNVs_and_annotations\n\
-		-secure_multiply_signalized_Indels_and_annotations\n\
 Variant Genotype Matrix Aggregation:\n\
 	Plaintext Variant Encoding:\n\
 		-encode_SNV_genotypes_2_matrix_per_VCF\n\
@@ -54,8 +45,6 @@ Variant Genotype Matrix Aggregation:\n\
 	Plaintext Aggregation:\n\
 		-plain_aggregate_encoded_Del_genotype_matrix\n\
 		-plain_aggregate_encoded_SNV_genotype_matrix\n\
-	Secure Aggregation:\n\
-		-secure_aggregate_encrpyted_SNV_genotype_matrix\n\
 Plain text Impact Analysis:\n\
 	-compare_VEP_annotations_with_SVAT_annotations\n\
 	-compare_ANNOVAR_vs_SVAT_variant_wise\n\
@@ -612,113 +601,6 @@ Plain text Impact Analysis:\n\
 		close_f(f_xcvtr_snv_annots, XCVATR_snv_annotation_fp);
 		close_f(f_op, vep_op_fp);
 	} // -convert_SNV_annotations_XCVATR_2_VEP option.
-	else if (t_string::compare_strings(argv[1], "-secure_multiply_signalized_SNVs_and_annotations"))
-	{
-		if (argc != 5)
-		{
-			fprintf(stderr, "%s %s [Plaintext Annotation Vector directory] \
-[Encrypted vectorized SNVs directory] \
-[Encrypted Annotated Variants Output directory]\n", argv[0], argv[1]);
-			exit(0);
-		}
-
-		char* plaintext_annotation_signal_dir = argv[2];
-		char* encrypted_SNV_vector_dir = argv[3];
-		char* op_dir = argv[4];
-
-		secure_multiply_SNV_variant_and_annotation_signals(plaintext_annotation_signal_dir, encrypted_SNV_vector_dir, op_dir);
-	} // -secure_multiply_signalized_SNVs_and_annotations
-	else if (t_string::compare_strings(argv[1], "-secure_aggregate_encrypted_SNV_genotype_matrix"))
-	{
-		if (argc != 7)
-		{
-			fprintf(stderr, "%s %s [Encrypted SNV genotypes directory] \
-[EOI regions BED path] \
-[Variant regions BED path] \
-[Sample id's list file path] \
-[Genotype Encoding (0:Existence/1:Allele Count)]\n", argv[0], argv[1]);
-			exit(0);
-		}
-
-		char* encrypted_vectorized_snv_genotypes_dir = argv[2];
-		char* EOI_regs_BED_fp = argv[3];
-		char* VOI_regs_BED_fp = argv[4];
-		char* sample_ids_list_fp = argv[5];
-		int genotype_encoding_type = atoi(argv[6]);
-
-		secure_aggregate_encrypted_SNV_genotype_matrix(encrypted_vectorized_snv_genotypes_dir,
-			EOI_regs_BED_fp,
-			VOI_regs_BED_fp,
-			sample_ids_list_fp,
-			genotype_encoding_type);
-	} // secure_aggregate_encrpyted_SNV_genotype_matrix option.
-	else if (t_string::compare_strings(argv[1], "-encrypt_vectorized_SNVs"))
-	{
-		if (argc != 5)
-		{
-			fprintf(stderr, "%s %s [Vectorized variants directory] \
-[EOI regions BED path] \
-[Output directory]\n", argv[0], argv[1]);
-			exit(0);
-		}
-
-		char* vectorized_SNVs_dir = argv[2];
-		char* EOI_regs_BED_fp = argv[3];
-		char* encrypted_SNVs_vector_op_dir = argv[4];
-
-		encrypt_vectorized_SNVs(vectorized_SNVs_dir, EOI_regs_BED_fp, encrypted_SNVs_vector_op_dir);
-	} // -encrypt_encoded_SNV_genotypes_2_matrix option end.
-	else if (t_string::compare_strings(argv[1], "-encrypt_encoded_SNV_genotypes_2_matrix"))
-	{
-		if (argc != 7)
-		{
-			fprintf(stderr, "%s %s [Encoded SNV genotypes directory] \
-[Encrypted SNV genotypes output directory] \
-[EOI regions BED path] \
-[Sample id's list file path] \
-[Genotype Encoding (0:Existence/1:Allele Count)]\n", argv[0], argv[1]);
-			exit(0);
-		}
-
-		char* encoded_vectorized_snvs_dir = argv[2];
-		char* encrypted_snv_genotype_matrix_dir = argv[3]; // This is the output directory.
-		char* EOI_regs_BED_fp = argv[4];
-		char* sample_ids_list_fp = argv[5];
-		int genotype_encoding_type = atoi(argv[6]);
-
-		encrypt_encoded_SNV_genotypes_2_matrix(encoded_vectorized_snvs_dir,
-			encrypted_snv_genotype_matrix_dir,
-			EOI_regs_BED_fp,
-			sample_ids_list_fp, // We need this only to know the number of inidividuals in the dataset, nothing else.
-			genotype_encoding_type);
-	} // -encrypt_encoded_SNV_genotypes_2_matrix option end.
-	else if (t_string::compare_strings(argv[1], "-reencrypt_SNV_genotypes_matrix"))
-	{
-		if (argc != 8)
-		{
-			fprintf(stderr, "%s %s [Encrypted SNV genotypes directory] \
-[Re-Encrypted SNV genotypes output directory] \
-[EOI regions BED path] \
-[Sample id's list file path] \
-[Genotype Encoding (0:Existence/1:Allele Count)] \
-[Public keys file path]\n", argv[0], argv[1]);
-			exit(0);
-		}
-
-		char* encrypted_snv_genotype_matrix_dir = argv[2];
-		char* reencrypted_snv_genotype_matrix_dir = argv[3];
-		char* EOI_regs_BED_fp = argv[4];
-		char* sample_ids_list_fp = argv[5];
-		int genotype_encoding_type = atoi(argv[6]);
-		char* public_keys_fp = argv[7];
-
-		re_encrypt_genotype_matrix(encrypted_snv_genotype_matrix_dir, // This is the output directory and the reencrypted data.
-			reencrypted_snv_genotype_matrix_dir, // This is the output directory and the reencrypted data.
-			EOI_regs_BED_fp, // This is necessary only to know the length of vectorized representation.
-			sample_ids_list_fp, 
-			genotype_encoding_type,
-			public_keys_fp);
-	} // -reencrypt_SNV_genotypes_matrix option.
 	if (t_string::compare_strings(argv[1], "-plain_aggregate_encoded_SNV_genotype_matrix"))
 	{
 		if (argc != 7)

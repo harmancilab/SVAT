@@ -108,10 +108,6 @@ void signalize_non_coding_variants_per_VCF(char* EOI_regs_BED_fp,
 	char* per_chrom_VCF_dir,
 	char* op_dir);
 
-void encrypt_vectorized_SNVs(char* vectorized_SNVs_dir, char* EOI_regs_BED_fp, char* encrypted_SNVs_vector_op_dir);
-
-void secure_multiply_SNV_variant_and_annotation_signals(char* plaintext_annotation_signal_dir, char* encrypted_SNV_vector_dir, char* op_dir);
-
 void generate_EOI_randomized_Indel_VCF(char* EOI_bed_fp, int l_max_indel, double per_posn_var_prob, double del_prob, char* bin_seq_dir, char* op_vcf_fp);
 void generate_EOI_randomized_SNV_VCF(char* EOI_bed_fp, double per_posn_var_prob, char* bin_seq_dir, char* op_vcf_fp);
 
