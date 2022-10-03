@@ -37,8 +37,7 @@ ${LIB_DIR}/svat_nucleotide.o \
 ${LIB_DIR}/file_utils.o
 
 SVAT: ${objs}
-	${CC} -O3 ${lib_flags} -o ${exec_name} ${objs}
+	${CC} -O3 -o ${exec_name} ${objs} ${lib_flags}
 
 clean:
 	rm -f ${objs} ${exec_name} 
-
